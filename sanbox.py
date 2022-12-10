@@ -1,21 +1,14 @@
-STATE_REQUEST_KEY = 'session'
-STATE_RESPONSE_KEY = 'session_state'
-
-
-def make_response(text, tts=None, card=None, state=None):
+def make_response(text, tts=None, card=None):
     response = {
         'text': text,
-        'tts': tts if tts is not None else text,
+        'tts': tts if tts is None else text,
     }
-    if card is not None:
+    if card is None:
         response['card'] = card
-    webhook_response = {
+    return {
         'response': response,
         'version': '1.0',
     }
-    if state is not None:
-        webhook_response[STATE_RESPONSE_KEY] = state
-    return webhook_response
 
 
 def image_gallery(image_ids):
@@ -35,9 +28,7 @@ def welcome_message(event):
 def start_tour(event):
     text = ('Сфера АйТи очень огромна, в ней есть множество различных профессий. '
             'О какой специальности рассказать подробнее?')
-    return make_response(text, state={
-        'screen': 'start_tour',
-    })
+    return make_response(text)
 
 def get_analyst(event):
     tts = ('Аналитик - это специалист, который занимается выявлением'
@@ -54,8 +45,8 @@ def get_analyst(event):
     )
 
 
-def start_tour_with_prof(event, intent_name='start_tour_with_prof'):
-    intent = event['request']['nlu']['intents'][intent_name]
+def start_tour_with_prof(event):
+    intent = event['request']['nlu']['intents']['start_tour_with_prof']
     prof = intent['slots']['prof']['value']
     if prof == 'analyst':
         return get_analyst(event)
@@ -71,21 +62,16 @@ def start_tour_with_prof(event, intent_name='start_tour_with_prof'):
         return fallback(event)
 
 def fallback(event):
-    return make_response(
-        'Извините, я Вас не поняла. Пожалуйста, попробуйте переформулировать.',
-        state=event['state'][STATE_REQUEST_KEY])
+    return make_response('Извините, я Вас не поняла. Пожалуйста, попробуйте переформулировать.')
 
 
 def handler(event, context):
     intents = event['request'].get('nlu', {}).get('intents')
-    state = event.get('state').get(STATE_REQUEST_KEY, {})
     if event['session']['new']:
         return welcome_message(event)
     elif 'start_tour' in intents:
         return start_tour(event)
     elif 'start_tour_with_prof' in intents:
         return start_tour_with_prof(event)
-    elif state.get('screen') == 'start_tour':
-        return start_tour_with_prof(event, intent_name='start_tour_with_prof_short')
     else:
         return fallback(event)
