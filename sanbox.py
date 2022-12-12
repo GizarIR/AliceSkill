@@ -204,7 +204,7 @@ def test_q6(event):
         tts=tts,
         state={
         'screen': 'test_q6',
-        }, 
+        },
         buttons=[
             button('Да', hide=True),
             button('Нет', hide=True),
@@ -271,7 +271,7 @@ def handler(event, context):
     state = event.get('state').get(STATE_REQUEST_KEY, {})
     if event['session']['new']:
         return welcome_message(event)
-    #Ветка НЕ ЗНАЮ 
+    #Ветка НЕ ЗНАЮ
     elif 'welcome_test' in intents:
         return welcome_test(event)
     # Перемещаемся в Тест
@@ -347,7 +347,7 @@ def handler(event, context):
         else:
             return fallback(event)
 
-    # Ветка ЗНАЮ 
+    # Ветка ЗНАЮ
     elif 'start_prof_tour' in intents:
         return start_tour(event)
     elif 'start_tour_with_prof' in intents:

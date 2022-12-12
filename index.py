@@ -2,7 +2,7 @@ STATE_REQUEST_KEY = 'session'
 STATE_RESPONSE_KEY = 'session_state'
 
 
-def make_response(text, tts=None, card=None, state=None, buttons=None):
+def make_response(text, tts=None, card=None, state=None, buttons=None, end_session=False):
     response = {
         'text': text,
         'tts': tts if tts is not None else text,
@@ -17,6 +17,8 @@ def make_response(text, tts=None, card=None, state=None, buttons=None):
         webhook_response[STATE_RESPONSE_KEY] = state
     if buttons:
         response['buttons'] = buttons
+    if end_session:
+        response['end_session'] = end_session
     return webhook_response
 
 
@@ -39,12 +41,13 @@ def image_gallery(image_ids):
         'items': items,
     }
 
+
 # НАЧАЛО диалога
 def welcome_message(event):
     text = ('Добро пожаловать, тут я могу помочь вам найти для себя новую профессию. '
             'Расскажу о самых интересных и востребованных IT профессий. '
             'Вы знаете какое направление вас интересует?')
-    return make_response(text, state = {
+    return make_response(text, state={
         'screen': 'welcome_message',
     }, buttons=[
         button('Знаю', hide=True),
@@ -70,12 +73,12 @@ def start_tour(event):
 
 def get_analyst(event):
     tts = ('Аналитик sil<[1000]> Аналитик - это специалист, который занимается выявлением'
-            'бизнес-проблем, выяснению потребностей заинтересованных сторон,' 
-            'обоснованию решений и обеспечению проведения изменений в организации.'
-            'О какой специальности рассказать еще?'
-    )
+           'бизнес-проблем, выяснению потребностей заинтересованных сторон,'
+           'обоснованию решений и обеспечению проведения изменений в организации.'
+           'О какой специальности рассказать еще?'
+           )
     return make_response(
-        text='О какой специальности рассказать еще?',
+        text=('О какой специальности рассказать еще?'),
         tts=tts,
         card=image_gallery(image_ids=[
             '965417/c21764e6199631467555',
@@ -88,7 +91,7 @@ def get_analyst(event):
             button('Проджект менеджер'),
             button('Дизайнер'),
             button('Стоп', hide=True),
-            ],
+        ],
         state=event['state'][STATE_REQUEST_KEY],
     )
 
@@ -96,11 +99,14 @@ def get_analyst(event):
 def get_tester(event):
     pass
 
+
 def get_developer(event):
     pass
 
+
 def get_project_manager(event):
     pass
+
 
 def get_designer(event):
     pass
@@ -121,6 +127,7 @@ def start_tour_with_prof(event, intent_name='start_tour_with_prof'):
         return make_response(text='Здесь появиться текст про Дизайнера')
     else:
         return fallback(event)
+
 
 # Тест
 def welcome_test(event):
@@ -167,6 +174,7 @@ def test_q3(event):
         button('Стоп', hide=True),
     ])
 
+
 # развилка на Аналитика и Тестировщика с Разработчиком
 def test_q4(event):
     text = ('Нравится ли вам общаться с людьми?')
@@ -177,6 +185,7 @@ def test_q4(event):
         button('Нет', hide=True),
         button('Стоп', hide=True),
     ])
+
 
 # ветка Аналитик
 def test_q5(event):
@@ -191,19 +200,20 @@ def test_q5(event):
 
 
 def test_q6(event):
-    text = ('Это специалист, который занимается выявлением бизнес-проблем, выяснением потребностей ' 
+    text = ('Это специалист, который занимается выявлением бизнес-проблем, выяснением потребностей '
             'заинтересованных сторон, обоснованием решений и обеспечением проведения изменений в '
             'организации. Вам нравится ?'
-    )
-    tts = (' Аналитик sil<[1000]>. Аналитик - это специалист, который занимается выявлением бизнес-проблем, выяснением потребностей ' 
-            'заинтересованных сторон, обоснованием решений и обеспечением проведения изменений в '
-            'организации. Вам нравится ?'
-    )
+            )
+    tts = (
+        ' Аналитик sil<[1000]>. Аналитик - это специалист, который занимается выявлением бизнес-проблем, выяснением потребностей '
+        'заинтересованных сторон, обоснованием решений и обеспечением проведения изменений в '
+        'организации. Вам нравится ?'
+        )
     return make_response(
         text,
         tts=tts,
         state={
-        'screen': 'test_q6',
+            'screen': 'test_q6',
         },
         buttons=[
             button('Да', hide=True),
@@ -222,6 +232,7 @@ def test_q7(event):
         button('Стоп', hide=True),
     ])
 
+
 def test_q8(event):
     text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом '
             'Хотите пройти тест еще раз?'
@@ -236,6 +247,43 @@ def test_q8(event):
         button('Нет', hide=True),
         button('Стоп', hide=True),
     ])
+
+
+# *********КОД ЮЛИ******************
+def test_q2_1(event):
+    text = ('Готовы ли вы лидировать в команде?')
+    return make_response(text, state={
+        'screen': 'test_q2_1',
+    }, buttons=[
+        button('Да', hide=True),
+        button('Нет', hide=True),
+        button('Стоп', hide=True),
+    ])
+
+
+def test_q2_2(event):
+    text = ('Если бы вы стали деревом, то каким?')
+    return make_response(text, state={
+        'screen': 'test_q2_2',
+    }, buttons=[
+        button('Дуб', hide=True),
+        button('Береза', hide=True),
+        button('Стоп', hide=True),
+    ])
+
+
+def test_q2_8(event):
+    text = ('Рисуете ли вы в воображении места, куда хотите отправиться?')
+    return make_response(text, state={
+        'screen': 'test_q2_8',
+    }, buttons=[
+        button('Да', hide=True),
+        button('Нет', hide=True),
+        button('Стоп', hide=True),
+    ])
+
+
+# *********КОНЕЦ КОДа ЮЛИ***********
 
 
 # Специфические обработки запросов
@@ -254,15 +302,14 @@ def handler_curses(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-            ])
-
+        ])
 
 
 def goodbye(event):
-    #TODO ВНИМАЕНИ нужно дописать функцию выхода из Диалога - пока это заглушка
     return make_response(
         'Было приятно поболтать! До новых встреч!',
-        state=None)
+        state=None,
+        end_session=True)
 
 
 # Основной обработчик
@@ -271,7 +318,7 @@ def handler(event, context):
     state = event.get('state').get(STATE_REQUEST_KEY, {})
     if event['session']['new']:
         return welcome_message(event)
-    #Ветка НЕ ЗНАЮ
+    # Ветка НЕ ЗНАЮ
     elif 'welcome_test' in intents:
         return welcome_test(event)
     # Перемещаемся в Тест
@@ -284,11 +331,17 @@ def handler(event, context):
             return goodbye(event)
         else:
             return fallback(event)
+    # Развилка - Аналитик или Тестировщик с Разработчиком
     elif state.get('screen') == 'test_q1':
-        if 'u_stop' in intents:
+        if 'u_yes' in intents:
+            return test_q2(event)
+        elif 'u_not' in intents:
+            # Уходим в ветку Юли
+            return test_q2_1(event)
+        elif 'u_stop' in intents:
             return goodbye(event)
         else:
-            return test_q2(event)
+            return fallback(event)
     elif state.get('screen') == 'test_q2':
         if 'u_stop' in intents:
             return goodbye(event)
@@ -343,10 +396,20 @@ def handler(event, context):
         elif 'u_stop' in intents:
             return goodbye(event)
         elif 'link_to_course' in intents:
-             return handler_curses(event)
+            return handler_curses(event)
         else:
             return fallback(event)
-
+    # *********КОД ЮЛИ******************
+    elif state.get('screen') == 'test_q2_1':
+        if 'u_yes' in intents:
+            return test_q2_2(event)
+        elif 'u_not' in intents:
+            return test_q2_8(event)
+        elif 'u_stop' in intents:
+            return goodbye(event)
+        else:
+            return fallback(event)
+    # *********КОНЕЦ КОДа ЮЛИ***********
     # Ветка ЗНАЮ
     elif 'start_prof_tour' in intents:
         return start_tour(event)
