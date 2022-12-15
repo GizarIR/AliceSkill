@@ -111,7 +111,7 @@ def get_analyst(event):
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
-    state['pre_intent'] = event['request']['nlu']['intents']['start_tour_with_prof_short']
+    state['pre_intent'] = event['request']['nlu']['intents']
 
     return make_response(
         text=('О какой специальности рассказать еще?'),
@@ -142,7 +142,7 @@ def get_tester(event):
            'и не упускать ошибки. О какой профессии рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
-    state['pre_intent'] = event['request']['nlu']['intents']['start_tour_with_prof_short']
+    state['pre_intent'] = event['request']['nlu']['intents']
 
     return make_response(
         text=('О какой специальности рассказать еще?'),
@@ -172,7 +172,7 @@ def get_developer(event):
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
-    state['pre_intent'] = event['request']['nlu']['intents']['start_tour_with_prof_short']
+    state['pre_intent'] = event['request']['nlu']['intents']
 
     return make_response(
         text=('О какой специальности рассказать еще?'),
@@ -204,7 +204,7 @@ def get_project_manager(event):
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
-    state['pre_intent'] = event['request']['nlu']['intents']['start_tour_with_prof_short']
+    state['pre_intent'] = event['request']['nlu']['intents']
 
     return make_response(
         text=('О какой специальности рассказать еще?'),
@@ -238,7 +238,7 @@ def get_designer(event):
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
-    state['pre_intent'] = event['request']['nlu']['intents']['start_tour_with_prof_short']
+    state['pre_intent'] = event['request']['nlu']['intents']
 
     return make_response(
         text=('О какой специальности рассказать еще?'),
@@ -274,7 +274,27 @@ def start_tour_with_prof(event, intent_name='start_tour_with_prof'):
     elif prof == 'designer':
         return get_designer(event)
     else:
-        return fallback(event)
+        return make_response(
+            'Этой профессии пока нет в этом навыке, но скоро обязательно появится',
+            state=event['state'][STATE_REQUEST_KEY]
+        )
+
+
+def what_do_you_know(event):
+    return make_response(
+        'Я постоянно развиваюсь, и знаю о многих профессиях. Например, могу рассказать про самые востребованные на сегодня профессии Аналитика, Тестировщика, Разработчика, Проджект менеджера, Дизайнера',
+        state=event['state'][STATE_REQUEST_KEY]
+    )
+
+    # term_1 = random.choice(["Аналитик", "Тестировщик", "Разработчик", "Проджект менеджер", "Дизайнер"])
+    # text = f'Я постоянно развиваюсь, на сегодяшний день я знаю о пяти профессиях. Например, рассказать про {term_1}?'
+    # return make_response(text, state={
+    #     'screen': 'what_do_you_know', 'prof': ''
+    # }, buttons=[
+    #     button('Да', hide=True),
+    #     button('Нет', hide=True),
+    #     button('Стоп', hide=True),
+    # ])
 
 
 # Тест

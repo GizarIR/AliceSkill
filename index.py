@@ -1,4 +1,5 @@
 from utils import *
+import random
 
 
 # Специфические обработки запросов
@@ -6,6 +7,37 @@ def fallback(event):
     return make_response(
         'Извините, я Вас не поняла. Пожалуйста, попробуйте переформулировать.',
         state=event['state'][STATE_REQUEST_KEY])
+
+
+def fallback_yes_no(event):
+    term_1 = random.choice([
+        "Похоже сегодня магнитные бури. Давайте по проще.",
+        "У меня сегодня  болит голова. Давайте по проще.",
+        "Вчера была вечеринка и я туго соображаю. Давайте по проще.",
+        "Банальности. С ними скучно и без них не обойтись. Давайте по проще.",
+        "Говорят: Будь проще, и люди к тебе потянутся.",
+        "Слово — что камень: коли метнёт его рука, то уж потом назад не воротишь. Но мне непонятно что за камень.",
+        "Ой. Я немного замечталась. И жду.",
+        "Глухой и тишины не услышит, вот и я не услышала ваш ответ",
+        "Если ты хочешь что-то изменить, перестаньте хотеть и начинайте менять. Поменяйте ответ.",
+    ])
+    text = f'{term_1} Ответьте на вопрос Да или Нет?'
+    return make_response(
+        text,
+        state=event['state'][STATE_REQUEST_KEY])
+
+
+def fallback_no_prof(event):
+    return make_response(
+        'Этой профессии пока нет в этом навыке, но скоро обязательно появится',
+        state=event['state'][STATE_REQUEST_KEY])
+
+
+def fallback_help_me(event):
+    return make_response(
+        'Могу предложить тест или рассказать про профессии',
+        state=event['state'][STATE_REQUEST_KEY])
+
 
 
 def handler_curses(event):
@@ -39,10 +71,29 @@ def handler(event, context):
             return welcome_test(event)
         elif ('start_prof_tour' in intents) or ('u_yes' in intents):  #Ветка ЗНАЮ - идем в тур по профессиям
             return start_tour(event)
-        elif ('start_tour_with_prof_short' in intents):  #Ветка ЗНАЮ - идем в конкретную  профессию
+        elif ('start_tour_with_prof' in intents):
+            return start_tour_with_prof(event, intent_name="start_tour_with_prof")
+            # return make_response('Speech about analyst')
+        elif ('start_tour_with_prof_short' in intents):
             return start_tour_with_prof(event, intent_name='start_tour_with_prof_short')
-        elif 'repeat_me' in intents:
+        elif 'repeat_me' in intents and state.get('pre_intent') is None:
             return welcome_message(event)
+        elif 'repeat_me' in intents and state.get('pre_intent') is not None:
+            if 'start_tour_with_prof' in list(state.get('pre_intent').keys()): # данная ветка необходима для обработки повторного повтора
+                intent_name_key = 'start_tour_with_prof'
+            else:
+                intent_name_key = 'start_tour_with_prof_short'
+            event['request']['nlu']['intents'].update(state.get('pre_intent'))
+            return start_tour_with_prof(event, intent_name=intent_name_key)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
+        elif 'what_do_you_know' in intents:
+            return what_do_you_know(event)
         else:
             return fallback(event)
     # Перемещаемся в Тест
@@ -55,8 +106,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return welcome_test(event)
+       # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     # Развилка - Аналитик или Тестировщик с Разработчик
     elif state.get('screen') == 'test_q1':
         if 'u_yes' in intents:
@@ -69,13 +127,27 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q1(event)
+       # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2':
         if 'u_stop' in intents:
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return test_q3(event)
     elif state.get('screen') == 'test_q3':
@@ -83,6 +155,13 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q3(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return test_q4(event)
     elif state.get('screen') == 'test_q4':
@@ -94,8 +173,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q5':
         if 'u_yes' in intents:
             return test_q6(event)
@@ -105,8 +191,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q5(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q6':
         if 'u_yes' in intents:
             return test_q7(event)
@@ -116,8 +209,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q6(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q7':
         if 'u_yes' in intents:
             return test_q8(event)
@@ -127,8 +227,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q7(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q8':
         if 'u_yes' in intents:
             return welcome_test(event)
@@ -140,6 +247,13 @@ def handler(event, context):
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q8(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
     # ветка Тестировщик
@@ -153,8 +267,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_1(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_2':
         if 'u_yes' in intents:
             return test_q4_3(event)
@@ -164,8 +285,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_2(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_3':
         if 'u_yes' in intents:
             return test_q4_4(event)
@@ -175,8 +303,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_3(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_4':
         if 'u_yes' in intents:
             return test_q4_5(event)
@@ -186,8 +321,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_4(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_5':
         if 'u_yes' in intents:
             return welcome_test(event)
@@ -199,6 +341,13 @@ def handler(event, context):
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q4_5(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
     # ветка Разработчик
@@ -211,8 +360,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_6(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_7':
         if 'u_yes' in intents:
             return test_q4_8(event)
@@ -222,8 +378,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_7(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_8':
         if 'u_yes' in intents:
             return test_q4_9(event)
@@ -233,8 +396,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q4_8(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q4_9':
         if 'u_yes' in intents:
             return welcome_test(event)
@@ -246,6 +416,13 @@ def handler(event, context):
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q4_9(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
     #*********КОД ЮЛИ******************
@@ -258,13 +435,27 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_1(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_2':
         if 'u_stop' in intents:
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_2(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return test_q2_3(event)
     elif state.get('screen') == 'test_q2_3':
@@ -276,9 +467,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_3(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
-
     elif state.get('screen') == 'test_q2_4':
         if 'u_yes' in intents:
             return test_q2_5(event)
@@ -288,8 +485,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_4(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_5':
         if 'u_yes' in intents:
             return test_q2_6(event)
@@ -299,8 +503,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_5(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_6':
         if 'u_yes' in intents:
             return test_q2_7(event)
@@ -310,8 +521,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_6(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_7':
         if 'u_yes' in intents:
             return welcome_test(event)
@@ -323,6 +541,13 @@ def handler(event, context):
             return test_q2_7(event)
         elif 'link_to_course' in intents:
             return handler_curses(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
     elif state.get('screen') == 'test_q2_8':
@@ -334,8 +559,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_8(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_9':
         if 'u_yes' in intents:
             return test_q2_10(event)
@@ -345,8 +577,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_9(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_10':
         if 'u_yes' in intents:
             return test_q2_11(event)
@@ -356,8 +595,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_10(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_11':
         if 'u_yes' in intents:
             return test_q2_12(event)
@@ -367,8 +613,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_11(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_12':
         if 'u_yes' in intents:
             return test_q2_13(event)
@@ -378,8 +631,15 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_12(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_13':
         if 'u_yes' in intents:
             return welcome_test(event)
@@ -391,6 +651,13 @@ def handler(event, context):
             return test_q2_13(event)
         elif 'link_to_course' in intents:
              return handler_curses(event)
+        # обработка помощи
+        elif 'help_me' in intents:
+            return fallback_help_me(event)
+        elif 'want_test' in intents:
+            return welcome_test(event)
+        elif 'start_tour' in intents:
+            return start_tour(event)
         else:
             return fallback(event)
     #*********КОНЕЦ КОДа ЮЛИ***********
@@ -401,16 +668,29 @@ def handler(event, context):
         return start_tour_with_prof(event)
     elif state.get('screen') == 'start_tour'  and 'start_tour_with_prof_short' in intents:
         return start_tour_with_prof(event, intent_name='start_tour_with_prof_short')
-    # elif state.get('screen') == 'start_tour'  and 'repeat_me' in intents:
-    #     return start_tour_with_prof(event, intent_name='start_tour_with_prof_short', prof=state.get('pre_prof'))
     elif state.get('screen') == 'start_tour'  and 'repeat_me' in intents:
-        event['request']['nlu']['intents']['start_tour_with_prof_short'] = state.get('pre_intent')
-        return start_tour_with_prof(event, intent_name='start_tour_with_prof_short')
+        # intent_name_key = list(state.get('pre_intent').keys())[0]
+        if 'start_tour_with_prof' in list(state.get('pre_intent').keys()): # данная ветка необходима для обработки повторного повтора
+            intent_name_key = 'start_tour_with_prof'
+        else:
+            intent_name_key = 'start_tour_with_prof_short'
+        event['request']['nlu']['intents'].update(state.get('pre_intent'))
+        return start_tour_with_prof(event, intent_name=intent_name_key)
     elif state.get('screen') == 'start_tour' and 'want_test' in intents:
         return welcome_test(event)
     elif state.get('screen') == 'start_tour' and 'u_not' in intents:
         return goodbye(event)
-    # Обработка неизвестных ответов и вопросов пользователля
+    # обработка помощи
+    elif 'help_me' in intents:
+        return fallback_help_me(event)
+    elif 'want_test' in intents:
+        return welcome_test(event)
+    elif 'start_tour' in intents:
+        return start_tour(event)
+    # Сценарий о каких можешь рассказать
+    elif 'what_do_you_know' in intents:
+        return what_do_you_know(event)
+    # Обработка неизвестных ответов и вопросов пользователя
     else:
         if 'u_stop' in intents:
             return goodbye(event)
