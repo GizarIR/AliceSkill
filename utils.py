@@ -1,25 +1,61 @@
+import datetime
+import sys
+import random
+
 STATE_REQUEST_KEY = 'session'
 STATE_RESPONSE_KEY = 'session_state'
 
 
-def make_response(text, tts=None, card=None, state=None, buttons=None, end_session=False):
+# Вспомогательные функции
+# узнаем имя функции для аналитики
+def whoami():
+    return sys._getframe(1).f_code.co_name
+
+
+def make_response(text, tts=None, card=None, state=None, buttons=None, end_session=False, events=None):
     response = {
         'text': text,
         'tts': tts if tts is not None else text,
     }
-    if card is not None:
-        response['card'] = card
     webhook_response = {
         'response': response,
         'version': '1.0',
     }
-    if state is not None:
-        webhook_response[STATE_RESPONSE_KEY] = state
+    if card is not None:
+        response['card'] = card
     if buttons:
         response['buttons'] = buttons
+    if state is not None:
+        webhook_response[STATE_RESPONSE_KEY] = state
+    if events is not None:
+        webhook_response["analytics"] = events
     if end_session:
         response['end_session'] = end_session
+        # webhook_response["analytics"]["events"]["value"]["end_session"] = state
+
     return webhook_response
+
+
+def make_events(name, event):
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    events = {
+        'events': [
+            {
+                "name": name,
+                "value": {
+                    "user_id": event['session']['user_id'],
+                    "user": event['state']['user'],
+                    "session_id": event['session']['session_id'],
+                    "timestamp": now,
+                    "command": event['request']['command'],
+                    "application_id": event['session']['application']['application_id'],
+                    "application": event['state']['application'],
+                    "client_id": event['meta']['client_id'],
+                }
+            }
+        ]
+    }
+    return events
 
 
 def button(title, payload=None, url=None, hide=False):
@@ -74,40 +110,129 @@ def image_card(image_id, title, description):
     }
 
 
+# Специфические обработки запросов Фэлбэки Курсы
+def fallback(event):
+    return make_response(
+        'Извините, я Вас не поняла. Пожалуйста, попробуйте переформулировать.',
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
+    )
+
+
+def fallback_yes_no(event):
+    term_1 = random.choice([
+        "Похоже сегодня магнитные бури. Давайте по проще.",
+        "У меня сегодня  болит голова. Давайте по проще.",
+        "Вчера была вечеринка и я туго соображаю. Давайте по проще.",
+        "Банальности. С ними скучно и без них не обойтись. Давайте попроще.",
+        "Говорят: Будь проще, и люди к тебе потянутся.",
+        "Слово — что камень: коли метнёт его рука, то уж потом назад не воротишь. Но мне непонятно что за камень.",
+        "Ой. Я немного замечталась. И жду.",
+        "Глухой и тишины не услышит, вот и я не услышала ваш ответ",
+        "Если ты хочешь что-то изменить, перестаньте хотеть и начинайте менять. Поменяйте ответ.",
+    ])
+    text = f'{term_1} Ответьте на вопрос Да или Нет?'
+    return make_response(
+        text,
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
+    )
+
+
+def fallback_help_me(event):
+    return make_response(
+        'Могу предложить тест или рассказать про профессии',
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
+    )
+
+
+def handler_curses(event):
+    text = ('Отличный выбор курса. Хотите пройти тест еще раз?')
+    return make_response(
+        text,
+        state=event['state'][STATE_REQUEST_KEY],
+        buttons=[
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
+
+
+def in_test_not_prof(event):
+    text = (
+        'Поздравляю! Вы очень разносторонний человек. '
+        'Тест закончился, а я похоже не смогла подобрать Вам профессию. '
+        'Могу предложить пройти тест или рассказать про профессии. '
+    )
+    return make_response(
+        text,
+        state=event['state'][STATE_REQUEST_KEY],
+        buttons=[
+            button('Пройти тест', hide=True),
+            button('Расскажи про профессии', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
+
+
+def goodbye(event):
+    return make_response(
+        'Было приятно поболтать! До новых встреч!',
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
+        end_session=True
+    )
+
+
 # НАЧАЛО диалога
 def welcome_message(event):
-    text = ('Добро пожаловать, тут я могу помочь вам найти для себя новую профессию. '
-            'Расскажу о самых интересных и востребованных IT профессий. '
+    text = ('Добро пожаловать, тут я помогу вам найти для себя новую профессию. '
+            'Расскажу о самых интересных и востребованных АйТи профессиях. '
             'Вы знаете какое направление вас интересует?')
-    return make_response(text, state={
-        'screen': 'welcome_message',
-    }, buttons=[
-        button('Знаю', hide=True),
-        button('Не знаю', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'welcome_message',
+        },
+        buttons=[
+            button('Знаю', hide=True),
+            button('Не знаю', hide=True),
+        ],
+        events=make_events(str(whoami()), event)
+    )
 
 
 # Рассказ о профессиях ( и Сценарий нет)
 def start_tour(event):
     text = ('Сфера АйТи очень огромна, в ней есть множество различных профессий. '
+            'Здесь я расскажу вам о профессиях, но вы по-прежнему можете пройти тест, если скажете: "Хочу тест." '
             'О какой специальности рассказать подробнее?')
-    return make_response(text, state={
-        'screen': 'start_tour',
-    }, buttons=[
-        button('Аналитик'),
-        button('Тестировщик'),
-        button('Разработчик'),
-        button('Проджект менеджер'),
-        button('Дизайнер'),
-        button('Хочу пройти тест', hide=True),
-        button('Стоп', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'start_tour',
+        },
+        buttons=[
+            button('Аналитик'),
+            button('Тестировщик'),
+            button('Разработчик'),
+            button('Проджект менеджер'),
+            button('Дизайнер'),
+            button('Хочу пройти тест', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def get_analyst(event):
     tts = ('Аналитик sil<[1000]> Аналитик - это специалист, который занимается выявлением'
            'бизнес-проблем, выяснению потребностей заинтересованных сторон,'
            'обоснованию решений и обеспечению проведения изменений в организации.'
+           'Здесь я рассказываю вам о профессиях, но вы по прежнему можете пройти тест, если скажете: "Хочу тест."'
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
@@ -130,6 +255,7 @@ def get_analyst(event):
             button('Стоп', hide=True),
         ],
         state=state,
+        events=make_events(str(whoami()), event),
     )
 
 
@@ -138,8 +264,9 @@ def get_tester(event):
            'он проверяет мобильные и веб-приложения, проверяет сервисы и проектирует тесты, '
            'а главное — помогает бизнесу развиваться, а пользователям решать задачи. Тестировщику нужно '
            'уметь работать с браузерами, понимать, чем они отличаются друг от друга. '
-           'А ещё быть внимательным и усидчивым, чтобы проверять продукт несколько раз '
-           'и не упускать ошибки. О какой профессии рассказать еще?'
+           'А ещё быть внимательным и усидчивым, чтобы проверять продукт несколько раз и не упускать ошибки. '
+           'Здесь я рассказываю вам о профессиях, но вы по прежнему можете пройти тест, если скажете: "Хочу тест."'
+           'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
     state['pre_intent'] = event['request']['nlu']['intents']
@@ -161,6 +288,7 @@ def get_tester(event):
             button('Стоп', hide=True),
         ],
         state=state,
+        events=make_events(str(whoami()), event)
     )
 
 
@@ -169,6 +297,7 @@ def get_developer(event):
            'на создание мобильных и компьютерных приложений, игр, баз данных и прочего '
            'программного обеспечения самых различных устройств. Разработчики в своей '
            'деятельности умело совмещают творческий подход и строгий язык программирования.'
+           'Здесь я рассказываю вам о профессиях, но вы по прежнему можете пройти тест, если скажете: "Хочу тест."'
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
@@ -192,6 +321,7 @@ def get_developer(event):
             button('Стоп', hide=True),
         ],
         state=state,
+        events=make_events(str(whoami()), event),
     )
 
 
@@ -201,6 +331,7 @@ def get_project_manager(event):
            'АйТИ, маркетинг, строительство, музыкальные, кино-, промышленные, '
            'сельскохозяйственные и пр. Любое дело, в котором занято больше одного человека, '
            '— это уже проект. Значит, нужен человек, который организует процесс и доведет его до финала. '
+           'Здесь я рассказываю вам о профессиях, но вы по прежнему можете пройти тест, если скажете: "Хочу тест."'
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
@@ -223,6 +354,7 @@ def get_project_manager(event):
             button('Стоп', hide=True),
         ],
         state=state,
+        events=make_events(str(whoami()), event),
     )
 
 
@@ -235,6 +367,7 @@ def get_designer(event):
            'последовательности будет отображаться информация при прокрутке страницы '
            'вниз.  Веб-дизайнер думает о цветах, композиции и простоте использования '
            'сайта для пользователя.'
+           'Здесь я рассказываю вам о профессиях, но вы по прежнему можете пройти тест, если скажете: "Хочу тест."'
            'О какой специальности рассказать еще?'
            )
     state = event['state'][STATE_REQUEST_KEY]
@@ -257,6 +390,19 @@ def get_designer(event):
             button('Стоп', hide=True),
         ],
         state=state,
+        events=make_events(str(whoami()), event),
+    )
+
+
+def fallback_no_prof(event):
+    text = (
+        'Этой профессии пока нет в этом навыке, но скоро обязательно появится. '
+        'Хотите пройти тест или рассказать еще о како-то профессии? '
+    )
+    return make_response(
+        text,
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
     )
 
 
@@ -274,16 +420,14 @@ def start_tour_with_prof(event, intent_name='start_tour_with_prof'):
     elif prof == 'designer':
         return get_designer(event)
     else:
-        return make_response(
-            'Этой профессии пока нет в этом навыке, но скоро обязательно появится',
-            state=event['state'][STATE_REQUEST_KEY]
-        )
+        return fallback_no_prof(event)
 
 
 def what_do_you_know(event):
     return make_response(
-        'Я постоянно развиваюсь, и знаю о многих профессиях. Например, могу рассказать про самые востребованные на сегодня профессии Аналитика, Тестировщика, Разработчика, Проджект менеджера, Дизайнера',
-        state=event['state'][STATE_REQUEST_KEY]
+        'Я постоянно развиваюсь, и знаю о многих профессиях. Например, о самых востребованных на сегодня: Аналитик, Тестировщик, Разработчик, и многих других.',
+        state=event['state'][STATE_REQUEST_KEY],
+        events=make_events(str(whoami()), event),
     )
 
     # term_1 = random.choice(["Аналитик", "Тестировщик", "Разработчик", "Проджект менеджер", "Дизайнер"])
@@ -301,35 +445,50 @@ def what_do_you_know(event):
 def welcome_test(event):
     text = ('Я могу вам предложить пройти небольшой тест, который поможет Вам определиться. '
             'Запускаем?')
-    return make_response(text, state={
-        'screen': 'start_test',
-    }, buttons=[
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'start_test',
+        },
+        buttons=[
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q1(event):
     text = ('Получаете ли вы удовольствие, решая различные головоломки?')
-    return make_response(text, state={
-        'screen': 'test_q1',
-    }, buttons=[
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'test_q1',
+        },
+        buttons=[
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q2(event):
     text = ('Выберите суперсилу: становиться невидимым или уметь летать?')
-    return make_response(text, state={
-        'screen': 'test_q2',
-    }, buttons=[
-        button('Становиться невидимым', hide=True),
-        button('Уметь летать', hide=True),
-        button('Стоп', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'test_q2',
+        },
+        buttons=[
+            button('Становиться невидимым', hide=True),
+            button('Уметь летать', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q3(event):
@@ -340,7 +499,8 @@ def test_q3(event):
         button('Меньше ста тысяч рублей', hide=True),
         button('Больше ста тысяч рублей', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 # развилка на Аналитика и Тестировщика с Разработчиком
@@ -352,19 +512,25 @@ def test_q4(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 # ветка Аналитик
 def test_q5(event):
     text = ('Поздравляю! Вам подойдет профессия Аналитика! Хотите узнать больше о профессии?')
-    return make_response(text, state={
-        'screen': 'test_q5',
-    }, buttons=[
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    return make_response(
+        text,
+        state={
+            'screen': 'test_q5',
+        },
+        buttons=[
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q6(event):
@@ -393,35 +559,51 @@ def test_q6(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-        ]
+        ],
+        events=make_events(str(whoami()), event),
     )
 
 
 def test_q7(event):
-    text = ('Хотите посмотреть какие есть курсы для Аналитиков ?')
+    text = ('Вам интересно узнать, какие курсы можно пройти, чтобы освоить эту профессию?')
     return make_response(text, state={
         'screen': 'test_q7',
     }, buttons=[
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q8(event):
-    text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом '
-            'Хотите пройти тест еще раз?'
+    text = ('Для того чтобы стать грамотным и востребованным специалистом можно пройти курсы перечисленные ниже. '
+            'Вы сможете самостоятельно найти их в поиске позже или пройти по ссылкам ниже. '
+            'Хотите пройти тест еще раз? '
             )
-    return make_response(text, state={
-        'screen': 'test_q8',
-    }, buttons=[
-        button('Курс для аналитика 1', url='https://ya.ru'),
-        button('Курс для аналитика 2', url='https://ya.ru'),
-        button('Курс для аналитика 3', url='https://ya.ru'),
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    tts = ('Для того чтобы стать грамотным и востребованным специалистом Вы можете пройти следующие курсы:'
+           'Курс "Профессия Бизнес-аналитик" Школа Skill Box;'
+           'Курс "Бизнес-аналитик базовый курс" Школа Нетология;'
+           'Вы можете самостоятельно найти их в поиске позже или пройти по ссылкам, если проходите тест на смартфоне. '
+           'Хотите пройти тест еще раз?'
+           )
+    return make_response(
+        text,
+        tts=tts,
+        state={
+            'screen': 'test_q8',
+        },
+        buttons=[
+            button('Курс "Профессия Бизнес-аналитик" Школа Skill Box',
+                   url='https://skillbox.ru/course/profession-business-analyst-cv/'),
+            button('Курс "Бизнес-аналитик базовый курс" Школа Нетология',
+                   url='https://netology.ru/programs/business-analytics-online'),
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q4_1(event):
@@ -432,7 +614,8 @@ def test_q4_1(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 # обработка ветки Тестировщик
@@ -445,7 +628,8 @@ def test_q4_2(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q4_3(event):
@@ -454,14 +638,14 @@ def test_q4_3(event):
             'бизнесу развиваться, а пользователям решать задачи. Тестировщику нужно '
             'уметь работать с браузерами, понимать, чем они отличаются друг от друга. '
             'А ещё быть внимательным и усидчивым, чтобы проверять продукт несколько раз '
-            'и не упускать ошибки. Вам нравиться?'
+            'и не упускать ошибки. Вам нравится?'
             )
     tts = ('Тестировщик sil<[1000]>. Тестировщик - это тоже специалист в АйТИ без программирования, '
            'он проверяет мобильные и веб-приложения, проверяет сервисы и проектирует тесты, '
            'а главное — помогает бизнесу развиваться, а пользователям решать задачи. Тестировщику нужно '
            'уметь работать с браузерами, понимать, чем они отличаются друг от друга. '
            'А ещё быть внимательным и усидчивым, чтобы проверять продукт несколько раз '
-           'и не упускать ошибки. Вам нравиться?'
+           'и не упускать ошибки. Вам нравится?'
            )
     return make_response(
         text='',
@@ -471,7 +655,6 @@ def test_q4_3(event):
             title='Так выглядит Тестировщик',
             description=text,
         ),
-
         state={
             'screen': 'test_q4_3',
         },
@@ -479,34 +662,50 @@ def test_q4_3(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-        ])
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q4_4(event):
-    text = ('Хотите посмотреть какие есть курсы для Тестировщиков ?')
+    text = ('Вам интересно узнать, какие курсы можно пройти, чтобы освоить эту профессию?')
     return make_response(text, state={
         'screen': 'test_q4_4',
     }, buttons=[
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q4_5(event):
-    text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом '
-            'Хотите пройти тест еще раз?'
+    text = ('Для того чтобы стать грамотным и востребованным специалистом можно пройти курсы перечисленные ниже. '
+            'Вы сможете самостоятельно найти их в поиске позже или пройти по ссылкам ниже. '
+            'Хотите пройти тест еще раз? '
             )
-    return make_response(text, state={
-        'screen': 'test_q4_5',
-    }, buttons=[
-        button('Курс для тестировщика 1', url='https://ya.ru'),
-        button('Курс для тестировщика 2', url='https://ya.ru'),
-        button('Курс для тестировщика 3', url='https://ya.ru'),
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    tts = ('Для того чтобы стать грамотным и востребованным специалистом Вы можете пройти следующие курсы:'
+           'Курс "Тестировщик на Python" Школа Skill Factory; '
+           'Курс «Инженер по тестированию» Школа Yandex; '
+           'Вы можете самостоятельно найти их в поиске позже или пройти по ссылкам, если проходите тест на смартфоне. '
+           'Хотите пройти тест еще раз?'
+           )
+    return make_response(
+        text,
+        tts=tts,
+        state={
+            'screen': 'test_q4_5',
+        },
+        buttons=[
+            button('Курс "Тестировщик на Python" Школа Skill Factory',
+                   url='https://skillfactory.ru/qa-engineer-python-testirovshchik-programmnogo-obespecheniya'),
+            button('Курс "Инженер по тестированию" Школа Yandex', url='https://skillbox.ru/course/profession-test/'),
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 # обработка ветки Разработчик
@@ -519,7 +718,8 @@ def test_q4_6(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q4_7(event):
@@ -527,13 +727,13 @@ def test_q4_7(event):
             'на создание мобильных и компьютерных приложений, игр, баз данных и прочего '
             'программного обеспечения самых различных устройств. Разработчики в своей '
             'деятельности умело совмещают творческий подход и строгий язык программирования.'
-            'Вам нравиться?'
+            'Вам нравится?'
             )
     tts = ('Разработчик sil<[1000]>. Разработчик – широкий термин для группы специалистов, работа которых направлена '
            'на создание мобильных и компьютерных приложений, игр, баз данных и прочего '
            'программного обеспечения самых различных устройств. Разработчики в своей '
            'деятельности умело совмещают творческий подход и строгий язык программирования.'
-           'Вам нравиться?'
+           'Вам нравится?'
            )
     return make_response(
         text='',
@@ -550,34 +750,51 @@ def test_q4_7(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-        ])
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q4_8(event):
-    text = ('Хотите посмотреть какие есть курсы для Разработчиков ?')
+    text = ('Вам интересно узнать, какие курсы можно пройти, чтобы освоить эту профессию?')
     return make_response(text, state={
         'screen': 'test_q4_8',
     }, buttons=[
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q4_9(event):
-    text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом '
-            'Хотите пройти тест еще раз?'
+    text = ('Для того чтобы стать грамотным и востребованным специалистом можно пройти курсы перечисленные ниже. '
+            'Вы сможете самостоятельно найти их в поиске позже или пройти по ссылкам ниже. '
+            'Хотите пройти тест еще раз? '
             )
-    return make_response(text, state={
-        'screen': 'test_q4_9',
-    }, buttons=[
-        button('Курс для разработчика 1', url='https://ya.ru'),
-        button('Курс для разработчика 2', url='https://ya.ru'),
-        button('Курс для разработчика 3', url='https://ya.ru'),
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    tts = ('Для того чтобы стать грамотным и востребованным специалистом Вы можете пройти следующие курсы:'
+           'Курс "Веб-разработчик с нуля". Школа Школа Скил фэктори; '
+           'Курс "Разработчик C++" Школа Яндекс; '
+           'Вы можете самостоятельно найти их в поиске позже или пройти по ссылкам, если проходите тест на смартфоне. '
+           'Хотите пройти тест еще раз? '
+           )
+    return make_response(
+        text,
+        tts=tts,
+        state={
+            'screen': 'test_q4_9',
+        },
+        buttons=[
+            button('Курс "Веб-разработчик с нуля". Школа Школа Скил фэктори',
+                   url='https://skillfactory.ru/python-fullstack-web-developer'),
+            button('Курс «Разработчик C++» Школа Яндекс',
+                   url='https://skillbox.ru/course/profession-fullstack-python/'),
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 # *********КОД ЮЛИ******************
@@ -589,7 +806,8 @@ def test_q2_1(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_2(event):
@@ -600,7 +818,8 @@ def test_q2_2(event):
         button('Дуб', hide=True),
         button('Береза', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_3(event):
@@ -611,7 +830,8 @@ def test_q2_3(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_4(event):
@@ -622,7 +842,8 @@ def test_q2_4(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_5(event):
@@ -652,34 +873,50 @@ def test_q2_5(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-        ])
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q2_6(event):
-    text = ('Хотите посмотреть какие есть курсы для прожект менеджеров ?')
+    text = ('Вам интересно узнать, какие курсы можно пройти, чтобы освоить эту профессию?')
     return make_response(text, state={
         'screen': 'test_q2_6',
     }, buttons=[
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_7(event):
-    text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом:'
-            'Хотите пройти тест еще раз?'
+    text = ('Для того чтобы стать грамотным и востребованным специалистом можно пройти курсы перечисленные ниже. '
+            'Вы сможете самостоятельно найти их в поиске позже или пройти по ссылкам ниже. '
+            'Хотите пройти тест еще раз? '
             )
-    return make_response(text, state={
-        'screen': 'test_q2_7',
-    }, buttons=[
-        button('Курс для проджект менеджера 1', url='https://ya.ru'),
-        button('Курс для прожект менеджера 2', url='https://ya.ru'),
-        button('Курс для прожект менеджера 3', url='https://ya.ru'),
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
+    tts = ('Для того чтобы стать грамотным и востребованным специалистом Вы можете пройти следующие курсы:'
+           'Курс "Профессия Project Manager в IT" Школа Skill Factory; '
+           'Курс "Менеджер проектов" Школа Yandex; '
+           'Вы можете самостоятельно найти их в поиске позже или пройти по ссылкам, если проходите тест на смартфоне. '
+           'Хотите пройти тест еще раз? '
+           )
+    return make_response(
+        text,
+        tts=tts,
+        state={
+            'screen': 'test_q2_7',
+        },
+        buttons=[
+            button('Курс "Профессия Project Manager в IT" Школа Skill Factory',
+                   url='https://skillfactory.ru/project-manager'),
+            button('Курс "Менеджер проектов" Школа Yandex', url='https://practicum.yandex.ru/project-manager/'),
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q2_8(event):
@@ -690,7 +927,8 @@ def test_q2_8(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_9(event):
@@ -701,7 +939,8 @@ def test_q2_9(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_10(event):
@@ -713,7 +952,8 @@ def test_q2_10(event):
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_11(event):
@@ -725,7 +965,7 @@ def test_q2_11(event):
             'последовательности будет отображаться информация при прокрутке '
             'страницы вниз.  Веб-дизайнер думает о цветах, композиции и простоте '
             'использования сайта для пользователя. '
-            'Вам нравиться?'
+            'Вам нравится?'
             )
     tts = ('Дизайнер sil<[1000]>. '
            'Это человек, который работает над внешним видом сайта. Он выбирает, '
@@ -735,7 +975,7 @@ def test_q2_11(event):
            'последовательности будет отображаться информация при прокрутке '
            'страницы вниз.  Веб-дизайнер думает о цветах, композиции и простоте '
            'использования сайта для пользователя. '
-           'Вам нравиться?'
+           'Вам нравится?'
            )
     return make_response(
         text='',
@@ -752,34 +992,49 @@ def test_q2_11(event):
             button('Да', hide=True),
             button('Нет', hide=True),
             button('Стоп', hide=True),
-        ])
+        ],
+        events=make_events(str(whoami()), event),
+    )
 
 
 def test_q2_12(event):
-    text = ('Хотите посмотреть какие есть курсы для Дизайнеров ?')
+    text = ('Вам интересно узнать, какие курсы можно пройти, чтобы освоить эту профессию?')
     return make_response(text, state={
         'screen': 'test_q2_12',
     }, buttons=[
         button('Да', hide=True),
         button('Нет', hide=True),
         button('Стоп', hide=True),
-    ])
+    ], events=make_events(str(whoami()), event),
+                         )
 
 
 def test_q2_13(event):
-    text = ('Вот такие курсы можно пройти, чтобы стать грамотным и востребованным специалистом '
-            'Хотите пройти тест еще раз?'
+    text = ('Для того чтобы стать грамотным и востребованным специалистом можно пройти курсы перечисленные ниже. '
+            'Вы сможете самостоятельно найти их в поиске позже или пройти по ссылкам ниже. '
+            'Хотите пройти тест еще раз? '
             )
-    return make_response(text, state={
-        'screen': 'test_q2_13',
-    }, buttons=[
-        button('Курс для дизайнера 1', url='https://ya.ru'),
-        button('Курс для дизайнера 2', url='https://ya.ru'),
-        button('Курс для дизайнера 3', url='https://ya.ru'),
-        button('Да', hide=True),
-        button('Нет', hide=True),
-        button('Стоп', hide=True),
-    ])
-
+    tts = ('Для того чтобы стать грамотным и востребованным специалистом Вы можете пройти следующие курсы:'
+           'Курс "Профессия веб-дизайнер" Школа Skill Factory; '
+           'Курс "Дизайнер интерфейсов" Школа Yandex; '
+           'Вы можете самостоятельно найти их в поиске позже или пройти по ссылкам, если проходите тест на смартфоне. '
+           'Хотите пройти тест еще раз? '
+           )
+    return make_response(
+        text,
+        tts=tts,
+        state={
+            'screen': 'test_q2_13',
+        },
+        buttons=[
+            button('Курс "Профессия веб-дизайнер" Школа Skill Factory',
+                   url='https://contented.ru/edu/web-designer?utm_source=skillfactory'),
+            button('Курс "Дизайнер интерфейсов" Школа Yandex',
+                   url='https://skillbox.ru/course/profession-webdesigner/'),
+            button('Да', hide=True),
+            button('Нет', hide=True),
+            button('Стоп', hide=True),
+        ],
+        events=make_events(str(whoami()), event),
+    )
 # *********КОНЕЦ КОДа ЮЛИ***********
-

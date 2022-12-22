@@ -1,63 +1,4 @@
 from utils import *
-import random
-
-
-# Специфические обработки запросов
-def fallback(event):
-    return make_response(
-        'Извините, я Вас не поняла. Пожалуйста, попробуйте переформулировать.',
-        state=event['state'][STATE_REQUEST_KEY])
-
-
-def fallback_yes_no(event):
-    term_1 = random.choice([
-        "Похоже сегодня магнитные бури. Давайте по проще.",
-        "У меня сегодня  болит голова. Давайте по проще.",
-        "Вчера была вечеринка и я туго соображаю. Давайте по проще.",
-        "Банальности. С ними скучно и без них не обойтись. Давайте по проще.",
-        "Говорят: Будь проще, и люди к тебе потянутся.",
-        "Слово — что камень: коли метнёт его рука, то уж потом назад не воротишь. Но мне непонятно что за камень.",
-        "Ой. Я немного замечталась. И жду.",
-        "Глухой и тишины не услышит, вот и я не услышала ваш ответ",
-        "Если ты хочешь что-то изменить, перестаньте хотеть и начинайте менять. Поменяйте ответ.",
-    ])
-    text = f'{term_1} Ответьте на вопрос Да или Нет?'
-    return make_response(
-        text,
-        state=event['state'][STATE_REQUEST_KEY])
-
-
-def fallback_no_prof(event):
-    return make_response(
-        'Этой профессии пока нет в этом навыке, но скоро обязательно появится',
-        state=event['state'][STATE_REQUEST_KEY])
-
-
-def fallback_help_me(event):
-    return make_response(
-        'Могу предложить тест или рассказать про профессии',
-        state=event['state'][STATE_REQUEST_KEY])
-
-
-
-def handler_curses(event):
-    text = ('Отличный выбор курса. Хотите пройти тест еще раз?')
-    return make_response(
-        text,
-        state=event['state'][STATE_REQUEST_KEY],
-        buttons=[
-            button('Да', hide=True),
-            button('Нет', hide=True),
-            button('Стоп', hide=True),
-            ])
-
-
-def goodbye(event):
-    return make_response(
-        'Было приятно поболтать! До новых встреч!',
-        state=None,
-        end_session=True)
-
 
 
 # Основной обработчик
@@ -92,7 +33,7 @@ def handler(event, context):
             return welcome_test(event)
         elif 'start_tour' in intents:
             return start_tour(event)
-        elif 'what_do_you_know' in intents:
+        elif 'what_do_you_know' in intents or 'what_do_you_know_long' in intents :
             return what_do_you_know(event)
         else:
             return fallback(event)
@@ -243,7 +184,7 @@ def handler(event, context):
             return start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
-        elif 'link_to_course' in intents:
+        elif 'link_to_course_accurate' in intents:
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q8(event)
@@ -337,7 +278,7 @@ def handler(event, context):
             return start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
-        elif 'link_to_course' in intents:
+        elif 'link_to_course_accurate' in intents:
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q4_5(event)
@@ -412,7 +353,7 @@ def handler(event, context):
             return start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
-        elif 'link_to_course' in intents:
+        elif 'link_to_course_accurate' in intents:
              return handler_curses(event)
         elif 'repeat_me' in intents:
             return test_q4_9(event)
@@ -462,7 +403,7 @@ def handler(event, context):
         if 'u_yes' in intents:
             return test_q2_4(event)
         elif 'u_not' in intents:
-            return start_tour(event)
+            return in_test_not_prof(event) #start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
         elif 'repeat_me' in intents:
@@ -475,7 +416,7 @@ def handler(event, context):
         elif 'start_tour' in intents:
             return start_tour(event)
         else:
-            return fallback(event)
+            return fallback_yes_no(event)
     elif state.get('screen') == 'test_q2_4':
         if 'u_yes' in intents:
             return test_q2_5(event)
@@ -539,7 +480,7 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_7(event)
-        elif 'link_to_course' in intents:
+        elif 'link_to_course_accurate' in intents:
             return handler_curses(event)
         # обработка помощи
         elif 'help_me' in intents:
@@ -554,7 +495,7 @@ def handler(event, context):
         if 'u_yes' in intents:
             return test_q2_9(event)
         elif 'u_not' in intents:
-            return start_tour(event)
+            return in_test_not_prof(event) #start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
         elif 'repeat_me' in intents:
@@ -572,7 +513,7 @@ def handler(event, context):
         if 'u_yes' in intents:
             return test_q2_10(event)
         elif 'u_not' in intents:
-            return start_tour(event)
+            return in_test_not_prof(event) #start_tour(event)
         elif 'u_stop' in intents:
             return goodbye(event)
         elif 'repeat_me' in intents:
@@ -649,7 +590,7 @@ def handler(event, context):
             return goodbye(event)
         elif 'repeat_me' in intents:
             return test_q2_13(event)
-        elif 'link_to_course' in intents:
+        elif 'link_to_course_accurate' in intents:
              return handler_curses(event)
         # обработка помощи
         elif 'help_me' in intents:
@@ -688,7 +629,7 @@ def handler(event, context):
     elif 'start_tour' in intents:
         return start_tour(event)
     # Сценарий о каких можешь рассказать
-    elif 'what_do_you_know' in intents:
+    elif 'what_do_you_know' in intents or 'what_do_you_know_long' in intents:
         return what_do_you_know(event)
     # Обработка неизвестных ответов и вопросов пользователя
     else:
