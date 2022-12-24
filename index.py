@@ -1,7 +1,7 @@
 from utils import *
 
 
-# Основной обработчик
+# Основной обработчик диалога
 def handler(event, context):
     intents = event['request'].get('nlu', {}).get('intents')
     state = event.get('state').get(STATE_REQUEST_KEY, {})
