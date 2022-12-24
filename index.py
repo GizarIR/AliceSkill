@@ -1,4 +1,6 @@
-from utils import 
+from utils import *
+
+
 # Основной обработчик
 def handler(event, context):
     intents = event['request'].get('nlu', {}).get('intents')
