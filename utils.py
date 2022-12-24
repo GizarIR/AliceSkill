@@ -131,6 +131,7 @@ def fallback_yes_no(event):
         "Глухой и тишины не услышит, вот и я не услышала ваш ответ",
         "Если ты хочешь что-то изменить, перестаньте хотеть и начинайте менять. Поменяйте ответ.",
     ])
+
     text = f'{term_1} Ответьте на вопрос Да или Нет?'
     return make_response(
         text,
@@ -429,17 +430,6 @@ def what_do_you_know(event):
         state=event['state'][STATE_REQUEST_KEY],
         events=make_events(str(whoami()), event),
     )
-
-    # term_1 = random.choice(["Аналитик", "Тестировщик", "Разработчик", "Проджект менеджер", "Дизайнер"])
-    # text = f'Я постоянно развиваюсь, на сегодяшний день я знаю о пяти профессиях. Например, рассказать про {term_1}?'
-    # return make_response(text, state={
-    #     'screen': 'what_do_you_know', 'prof': ''
-    # }, buttons=[
-    #     button('Да', hide=True),
-    #     button('Нет', hide=True),
-    #     button('Стоп', hide=True),
-    # ])
-
 
 # Тест
 def welcome_test(event):
