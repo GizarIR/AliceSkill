@@ -7,4 +7,5 @@ The code was started to develop at the Alice Skills hackathon.
 For start release version 001 you need to use only files:
 - index.py
 - utils.py
-Now, we update our application with recommended approach of scences.   
+
+Now, we update our application with recommended approach of scenes.   
