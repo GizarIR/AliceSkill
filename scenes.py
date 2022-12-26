@@ -3,30 +3,33 @@ import inspect
 import sys
 from abc import ABC, abstractmethod
 from typing import Optional
+import json
 
 import intents
 from request import Request
-from response_helper import (
+from response_helpers import (
     button,
     image_gallery,
 )
-from state import STATE_RESPONSE_KEY
+from state import STATE_REQUEST_KEY, STATE_RESPONSE_KEY
+
 
 class Prof(enum.Enum):
     UNKNOWN = 1
     ANALYST = 2
     TESTER = 3
-    DEVLOPER = 4
 
     @classmethod
     def from_request(cls, request: Request, intent_name: str):
-        slot = request.intents[intent_name]['slots']['prof']['value']
+        # slots = request.intents
+        slot = request.intents.get(intent_name, {})
+        # print(f'СЛОТЫ Тип: {type(slots)}, Значение: {slots}, Один слот: {slot} ')
+        if slot != {}:
+            slot = request.intents[intent_name]['slots']['prof']['value']
         if slot == 'analyst':
             return cls.ANALYST
         elif slot == 'tester':
             return cls.TESTER
-        elif slot == 'developer':
-            return cls.DEVELOPER
         else:
             return cls.UNKNOWN
 
@@ -35,12 +38,10 @@ def move_to_prof_scene(request: Request, intent_name: str):
     prof = Prof.from_request(request, intent_name)
     if prof == Prof.ANALYST:
         return Analyst()
-    elif prof == Prof.CATHEDRAL:
+    elif prof == Prof.TESTER:
         return Tester()
-    elif prof == Prof.DEVELOPER:
-        return Developer()
     else:
-        return UnknownPlace()
+        return UnknownProf()
 
 
 class Scene(ABC):
@@ -95,23 +96,20 @@ class Scene(ABC):
         return webhook_response
 
 
-class ProfTourScene(Scene):
+class TestTourScene(Scene):
 
     def handle_global_intents(self, request):
-        if intents.START_TOUR in request.intents:
-            return StartTour()
-        elif intents.START_TOUR_WITH_PROF in request.intents:
-            return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF)
+        if intents.START_TOUR_TEST in request.intents:
+            return WelcomeTest()
 
-class Welcome(ProfTourScene):
+
+class WelcomeTest(TestTourScene):
     def reply(self, request: Request):
-        text = ('Добро пожаловать, тут я рассказываю о самых интересных и востребованных АйТи профессиях. '
+        # scenes = str(SCENES)
+        text = ('Добро пожаловать, давайте пройдем тест. '
                 'Начнем?')
         return self.make_response(
             text,
-            state={
-                'scene': 'welcome'
-            },
             buttons=[
                 button('Да', hide=True),
                 button('Нет', hide=True),
@@ -119,12 +117,31 @@ class Welcome(ProfTourScene):
         )
 
     def handle_local_intents(self, request: Request):
-        if intents.U_YES:
-            return move_to_prof_scene(request, intents.START_TOUR)
+        if intents.U_YES in request.intents:
+            return Query_1()
+        # по умолчанию если не условие то уйдет в fallback
 
-class StartTour(ProfTourScene):
+
+class Query_1(TestTourScene):
     def reply(self, request: Request):
-        text = 'Я знаю огромное количество профейссий в ИТ, для начала могу рассказать об Аналитике?'
+        text = ('Поздравляем вы прошли тест. Хотите поговорить о профессиях?')
+        return self.make_response(
+            text,
+            buttons=[
+                button('Да', hide=True),
+                button('Нет', hide=True),
+            ],
+        )
+
+    def handle_local_intents(self, request: Request):
+        if intents.U_YES in request.intents:
+            return StartTour()
+
+
+
+class StartTour(TestTourScene):
+    def reply(self, request: Request):
+        text = 'Отлично! Давайте поговорим о профессиях? О какой бы Вы хотели?'
         return self.make_response(
             text,
             state={
@@ -133,29 +150,67 @@ class StartTour(ProfTourScene):
             buttons=[
                 button('Аналитик'),
                 button('Тестировщик'),
-                button('Разработчик'),
             ]
         )
 
     def handle_local_intents(self, request: Request):
-        if intents.U_YES:
-            return move_to_prof_scene(request, intents.START_TOUR_WITH_PLACE_SHORT)
+        if intents.START_TOUR_WITH_PROF_SHORT:
+            return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF_SHORT)
 
 
-class Analyst(ProfTourScene):
+class Analyst(TestTourScene):
     def reply(self, request: Request):
-        tts = ('В будущем здесь появится описание Аналитика')
         return self.make_response(
-            text,
+            text='В будущем здесь появится рассказ об Аналитике. О ком еще рассказать?',
+            state={
+                'screen': 'start_tour'
+            },
             buttons=[
                 button('Аналитик'),
                 button('Тестировщик'),
-                button('Разработчик'),
             ]
         )
 
     def handle_local_intents(self, request: Request):
-        pass
+        if intents.START_TOUR_WITH_PROF_SHORT:
+            return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF_SHORT)
+
+
+class Tester(TestTourScene):
+    def reply(self, request: Request):
+        return self.make_response(
+            text='В будущем здесь появится рассказ об Тестеровщике. О ком еще рассказать?',
+            state={
+                'screen': 'start_tour'
+            },
+            buttons=[
+                button('Аналитик'),
+                button('Тестировщик'),
+            ]
+        )
+
+    def handle_local_intents(self, request: Request):
+        if intents.START_TOUR_WITH_PROF_SHORT:
+            return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF_SHORT)
+
+
+class UnknownProf(TestTourScene):
+    def reply(self, request: Request):
+        return self.make_response(
+            text='Я такой профессии не знаю. О ком еще рассказать?',
+            state={
+                'screen': 'start_tour'
+            },
+            buttons=[
+                button('Аналитик'),
+                button('Тестировщик'),
+            ]
+        )
+
+    def handle_local_intents(self, request: Request):
+        if intents.START_TOUR_WITH_PROF_SHORT:
+            return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF_SHORT)
+
 
 
 def _list_scenes():
@@ -171,5 +226,4 @@ SCENES = {
     scene.id(): scene for scene in _list_scenes()
 }
 
-DEFAULT_SCENE = Welcome
-
+DEFAULT_SCENE = WelcomeTest
