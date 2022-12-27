@@ -18,14 +18,21 @@ class Prof(enum.Enum):
     UNKNOWN = 1
     ANALYST = 2
     TESTER = 3
+    # состояния ниже и их обработка  введены для возможности получения помощи и перехода в начало теста
+    WELCOMETEST = 4
+    HELPME = 5
 
     @classmethod
     def from_request(cls, request: Request, intent_name: str):
-        # slots = request.intents
+        slots = request.intents
         slot = request.intents.get(intent_name, {})
-        # print(f'СЛОТЫ Тип: {type(slots)}, Значение: {slots}, Один слот: {slot} ')
+        print(f'СЛОТЫ Тип: {type(slots)}, Значение: {slots}, Один слот: {slot} ')
         if slot != {}:
             slot = request.intents[intent_name]['slots']['prof']['value']
+        elif intents.START_TOUR_TEST in request.intents:
+            return cls.WELCOMETEST
+        elif intents.HELP_ME in request.intents:
+            return cls.HELPME
         if slot == 'analyst':
             return cls.ANALYST
         elif slot == 'tester':
@@ -40,6 +47,10 @@ def move_to_prof_scene(request: Request, intent_name: str):
         return Analyst()
     elif prof == Prof.TESTER:
         return Tester()
+    elif prof == Prof.WELCOMETEST:
+        return WelcomeTest()
+    elif prof == Prof.HELPME:
+        return HelpMe()
     else:
         return UnknownProf()
 
@@ -51,11 +62,13 @@ class Scene(ABC):
         return cls.__name__
 
     """Генерация ответа сцены"""
+
     @abstractmethod
     def reply(self, request):
         raise NotImplementedError()
 
     """Проверка перехода к новой сцене"""
+
     def move(self, request: Request):
         next_scene = self.handle_local_intents(request)
         if next_scene is None:
@@ -71,7 +84,13 @@ class Scene(ABC):
         raise NotImplementedError()
 
     def fallback(self, request: Request):
-        return self.make_response('Извините, я вас не поняла. Пожалуйста, попробуйте переформулировать.')
+        text = ('Извините, я вас не поняла. Пожалуйста, попробуйте переформулировать.')
+        # state=request.state
+        # events=make_events(str(whoami()), event),
+        return self.make_response(
+            text,
+            # state,
+        )
 
     def make_response(self, text, tts=None, card=None, state=None, buttons=None, directives=None):
         response = {
@@ -101,6 +120,32 @@ class TestTourScene(Scene):
     def handle_global_intents(self, request):
         if intents.START_TOUR_TEST in request.intents:
             return WelcomeTest()
+        elif intents.START_TOUR in request.intents:
+            return StartTour()
+        elif intents.HELP_ME in request.intents:
+            return HelpMe()
+
+
+class HelpMe(TestTourScene):
+    def reply(self, request: Request):
+        text = ('Я вам помогу. Я могу запустить тест или разссказать о профессиях. Продолжим?')
+        # state=request.state
+        print(f'ПОМОЩЬ: {request.state}')
+        add_state = {'prev_scene': request.state}
+        return self.make_response(
+            text,
+            state=add_state,
+        )
+
+    def handle_local_intents(self, request: Request):
+        if intents.WILL_CONTINUE in request.intents:
+            print(f'ОБРАБОТКА ПОМОЩИ: {request.prev_state}')
+            next_scene = SCENES.get(request.prev_state, DEFAULT_SCENE)()
+            print(f'ОБРАБОТКА ПОМОЩИ СЛЕД СЦЕНА: {next_scene}')
+            return next_scene
+        elif intents.REPEAT_ME in request.intents:
+            return HelpMe()
+        # по умолчанию если не условие то уйдет в fallback
 
 
 class WelcomeTest(TestTourScene):
@@ -119,7 +164,22 @@ class WelcomeTest(TestTourScene):
     def handle_local_intents(self, request: Request):
         if intents.U_YES in request.intents:
             return Query_1()
+        elif intents.REPEAT_ME in request.intents:
+            return WelcomeTest()
         # по умолчанию если не условие то уйдет в fallback
+
+    def fallback(self, request: Request):
+        text = ('Извините, я вас не поняла. Мы таки идем в тест? ')
+        # state=request.state
+        # events=make_events(str(whoami()), event),
+        return self.make_response(
+            text,
+            # state=state,
+            buttons=[
+                button('Да', hide=True),
+                button('Нет', hide=True),
+            ],
+        )
 
 
 class Query_1(TestTourScene):
@@ -136,7 +196,6 @@ class Query_1(TestTourScene):
     def handle_local_intents(self, request: Request):
         if intents.U_YES in request.intents:
             return StartTour()
-
 
 
 class StartTour(TestTourScene):
@@ -210,7 +269,6 @@ class UnknownProf(TestTourScene):
     def handle_local_intents(self, request: Request):
         if intents.START_TOUR_WITH_PROF_SHORT:
             return move_to_prof_scene(request, intents.START_TOUR_WITH_PROF_SHORT)
-
 
 
 def _list_scenes():

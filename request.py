@@ -16,5 +16,9 @@ class Request:
         return self.request_body['state'].get(STATE_REQUEST_KEY, {}).get('scene', {})
 
     @property
+    def prev_state(self):
+        return self.request_body['state'].get(STATE_REQUEST_KEY, {}).get('prev_scene', {})
+
+    @property
     def type(self):
         return self.request_body.get('request', {}).get('type')
