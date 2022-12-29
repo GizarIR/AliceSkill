@@ -11,7 +11,7 @@ from response_helpers import (
     button,
     image_gallery,
 )
-from state import STATE_REQUEST_KEY, STATE_RESPONSE_KEY
+from state import STATE_REQUEST_KEY, STATE_RESPONSE_KEY, STATE_USER_UPDATE_KEY
 
 
 class Prof(enum.Enum):
@@ -92,7 +92,8 @@ class Scene(ABC):
             # state,
         )
 
-    def make_response(self, text, tts=None, card=None, state=None, buttons=None, directives=None):
+    def make_response(self, text, tts=None, card=None, state=None, buttons=None, directives=None,
+                      state_user_update=None):
         response = {
             'text': text,
             'tts': tts if tts is not None else text,
@@ -112,6 +113,8 @@ class Scene(ABC):
         }
         if state is not None:
             webhook_response[STATE_RESPONSE_KEY].update(state)
+        if state_user_update is not None:
+            webhook_response[STATE_USER_UPDATE_KEY] = state_user_update
         return webhook_response
 
 
@@ -153,12 +156,16 @@ class WelcomeTest(TestTourScene):
         # scenes = str(SCENES)
         text = ('Добро пожаловать, давайте пройдем тест. '
                 'Начнем?')
+        # тестирование сохранения параметров пользователя между сессиями
+        # state_user_update = {'value': '42'} - записать
+        # state_user_update={'value': None} - стереть
         return self.make_response(
             text,
             buttons=[
                 button('Да', hide=True),
                 button('Нет', hide=True),
             ],
+            # state_user_update = state_user_update, # добавлен параметр в функцию
         )
 
     def handle_local_intents(self, request: Request):
@@ -185,6 +192,7 @@ class WelcomeTest(TestTourScene):
 class Query_1(TestTourScene):
     def reply(self, request: Request):
         text = ('Поздравляем вы прошли тест. Хотите поговорить о профессиях?')
+        # тестирование сохранения параметров пользователя между сессиями
         return self.make_response(
             text,
             buttons=[

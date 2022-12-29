@@ -6,3 +6,6 @@ __pycache__/
 .DS_Store
 **/__pycache__/
 .idea/
+sandbox.py
+data.txt
+data.json
